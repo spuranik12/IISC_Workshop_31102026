@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DevTrack</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --text: #1d2330; --muted: #6b7385;
+    --border: #e1e4ea; --accent: #3b6ef5; --accent-soft: #e8eefe;
+    --red: #d64545; --orange: #e08a1e; --green: #2f9e63; --purple: #7d4fd6;
+    --shadow: 0 1px 3px rgba(20,30,50,.08);
+  }
+  [data-theme="dark"] {
+    --bg: #14171d; --panel: #1d2129; --text: #e4e7ee; --muted: #8b93a5;
+    --border: #2c323d; --accent: #6b8ff8; --accent-soft: #252d45;
+    --shadow: 0 1px 3px rgba(0,0,0,.4);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 14px;
+         background: var(--bg); color: var(--text); }
+  header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; background: var(--panel);
+           border-bottom: 1px solid var(--border); flex-wrap: wrap; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 18px; margin: 0; }
+  header h1 span { color: var(--accent); }
+  nav { display: flex; gap: 4px; }
+  nav button { background: none; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer;
+               color: var(--muted); font: inherit; font-weight: 500; }
+  nav button.active { background: var(--accent-soft); color: var(--accent); }
+  .spacer { flex: 1; }
+  button.btn { background: var(--accent); color: #fff; border: none; padding: 8px 14px; border-radius: 6px;
+               cursor: pointer; font: inherit; font-weight: 500; }
+  button.btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  button.btn.danger { background: var(--red); }
+  input, select, textarea { font: inherit; color: var(--text); background: var(--panel);
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; }
+  textarea { resize: vertical; min-height: 70px; width: 100%; }
+  main { padding: 20px; max-width: 1400px; margin: 0 auto; }
+  .view[hidden] { display: none; }
+
+  /* Toolbar */
+  .toolbar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .toolbar input[type=search] { flex: 1; min-width: 200px; }
+
+  /* Board */
+  .board { display: grid; grid-template-columns: repeat(4, minmax(240px, 1fr)); gap: 14px; overflow-x: auto; }
+  .column { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px;
+            min-height: 300px; display: flex; flex-direction: column; }
+  .column.drag-over { outline: 2px dashed var(--accent); }
+  .column h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+               margin: 4px 6px 10px; display: flex; justify-content: space-between; }
+  .cards { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+          cursor: grab; box-shadow: var(--shadow); border-left: 4px solid var(--muted); }
+  .card.p-critical { border-left-color: var(--red); }
+  .card.p-high { border-left-color: var(--orange); }
+  .card.p-medium { border-left-color: var(--accent); }
+  .card.p-low { border-left-color: var(--green); }
+  .card.dragging { opacity: .4; }
+  .card .title { font-weight: 600; margin-bottom: 6px; word-break: break-word; }
+  .card .meta { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 12px; color: var(--muted); }
+  .badge { padding: 2px 7px; border-radius: 10px; font-size: 11px; font-weight: 600; background: var(--accent-soft); color: var(--accent); }
+  .badge.bug { background: #fde8e8; color: var(--red); }
+  .badge.feature { background: #e6f5ec; color: var(--green); }
+  .badge.chore { background: #eee8fb; color: var(--purple); }
+  .badge.research { background: #fdf1e1; color: var(--orange); }
+  [data-theme="dark"] .badge.bug { background: #3a1f22; }
+  [data-theme="dark"] .badge.feature { background: #1c3328; }
+  [data-theme="dark"] .badge.chore { background: #2b2340; }
+  [data-theme="dark"] .badge.research { background: #3a2c18; }
+  .overdue { color: var(--red); font-weight: 600; }
+  .timer-btn { margin-left: auto; border: 1px solid var(--border); background: var(--panel); color: var(--text);
+               border-radius: 5px; padding: 2px 8px; cursor: pointer; font-size: 12px; }
+  .timer-btn.running { background: var(--red); color: #fff; border-color: var(--red); }
+
+  /* Dashboard */
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; }
+  .stat .label { color: var(--muted); font-size: 12px; }
+  .stat .value { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .panel h3 { margin: 0 0 12px; font-size: 15px; }
+  .bars .row { display: grid; grid-template-columns: 110px 1fr 70px; gap: 10px; align-items: center; margin: 6px 0; }
+  .bars .track { background: var(--bg); border-radius: 4px; height: 14px; overflow: hidden; }
+  .bars .fill { background: var(--accent); height: 100%; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 800px) { .grid2 { grid-template-columns: 1fr; } }
+
+  /* Log */
+  .log-entry { border-bottom: 1px solid var(--border); padding: 10px 0; }
+  .log-entry:last-child { border-bottom: none; }
+  .log-entry .date { font-weight: 600; }
+  .log-entry pre { white-space: pre-wrap; font-family: inherit; margin: 6px 0 0; }
+  .log-sec { color: var(--muted); font-size: 12px; text-transform: uppercase; margin-top: 6px; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center;
+              justify-content: center; z-index: 10; padding: 16px; }
+  .modal-bg[hidden] { display: none; }
+  .modal { background: var(--panel); border-radius: 12px; padding: 20px; width: 100%; max-width: 560px;
+           max-height: 90vh; overflow-y: auto; }
+  .modal h2 { margin: 0 0 14px; font-size: 18px; }
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-grid label, .full label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 500; }
+  .full { grid-column: 1 / -1; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 16px; }
+  .empty { color: var(--muted); text-align: center; padding: 20px; font-size: 13px; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; }
+
+  /* Profile */
+  .profile-chip { display: flex; align-items: center; gap: 8px; background: none; border: 1px solid var(--border);
+                  border-radius: 20px; padding: 3px 12px 3px 3px; cursor: pointer; color: var(--text); font: inherit; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: #fff; display: flex;
+            align-items: center; justify-content: center; font-weight: 700; font-size: 12px; }
+  .avatar.lg { width: 56px; height: 56px; font-size: 20px; }
+  .profile-chip .who { display: flex; flex-direction: column; line-height: 1.15; text-align: left; }
+  .profile-chip .who small { color: var(--muted); font-size: 11px; }
+  .profile-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+
+  /* Login */
+  #loginScreen { background: var(--bg); z-index: 20; }
+  #loginScreen .modal { max-width: 380px; }
+  #loginScreen h2 { text-align: center; }
+  #loginScreen label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 500; margin-bottom: 10px; }
+  .pw-row { display: flex; gap: 6px; }
+  .pw-row input { flex: 1; min-width: 0; }
+  .login-error { color: var(--red); font-size: 13px; min-height: 18px; margin-bottom: 6px; }
+  .demo-hint { margin-top: 14px; padding: 10px; background: var(--accent-soft); border-radius: 8px; font-size: 12px; color: var(--muted); }
+  .demo-hint code { color: var(--text); font-weight: 600; }
+  body.logged-out > header, body.logged-out > main { display: none; }
+
+  /* Progress */
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { background: none; border: none; padding: 7px 14px; cursor: pointer; color: var(--muted); font: inherit; font-weight: 500; }
+  .seg button.active { background: var(--accent-soft); color: var(--accent); }
+  .period-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+  .period-label { font-weight: 600; min-width: 160px; text-align: center; }
+  .delta { font-size: 12px; font-weight: 600; margin-top: 4px; color: var(--muted); }
+  .delta.up { color: var(--green); }
+  .delta.down { color: var(--red); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Dev<span>Track</span></h1>
+  <nav>
+    <button data-view="board" class="active">Board</button>
+    <button data-view="dashboard">Dashboard</button>
+    <button data-view="progress">Progress</button>
+    <button data-view="log">Daily Log</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="btn ghost" id="themeBtn" title="Toggle theme">🌓</button>
+  <button class="btn ghost" id="exportBtn">Export</button>
+  <button class="btn ghost" id="importBtn">Import</button>
+  <input type="file" id="importFile" accept=".json" hidden>
+  <button class="btn" id="newTaskBtn">+ New Task</button>
+  <button class="profile-chip" id="profileBtn" title="Edit profile">
+    <span class="avatar" id="avatarSm"></span>
+    <span class="who"><span id="profileName"></span><small id="profileRole"></small></span>
+  </button>
+  <button class="btn ghost" id="logoutBtn">Logout</button>
+</header>
+
+<main>
+  <!-- BOARD -->
+  <section class="view" id="view-board">
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search title, description, tags, ticket…">
+      <select id="filterType">
+        <option value="">All types</option>
+        <option>feature</option><option>bug</option><option>chore</option><option>research</option>
+      </select>
+      <select id="filterPriority">
+        <option value="">All priorities</option>
+        <option>critical</option><option>high</option><option>medium</option><option>low</option>
+      </select>
+      <select id="filterProject"><option value="">All projects</option></select>
+    </div>
+    <div class="board" id="board"></div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="view" id="view-dashboard" hidden>
+    <div class="stats" id="stats"></div>
+    <div class="grid2">
+      <div class="panel"><h3>Time logged by project</h3><div class="bars" id="timeByProject"></div></div>
+      <div class="panel"><h3>Tasks by type</h3><div class="bars" id="byType"></div></div>
+    </div>
+    <div class="panel"><h3>Upcoming &amp; overdue</h3><div id="upcoming"></div></div>
+    <div class="panel"><h3>Recently completed</h3><div id="recentDone"></div></div>
+  </section>
+
+  <!-- PROGRESS -->
+  <section class="view" id="view-progress" hidden>
+    <div class="period-bar">
+      <div class="seg" id="periodSeg">
+        <button data-period="week" class="active">Weekly</button>
+        <button data-period="month">Monthly</button>
+      </div>
+      <button class="btn ghost" id="periodPrev" title="Previous">‹</button>
+      <span class="period-label" id="periodLabel"></span>
+      <button class="btn ghost" id="periodNext" title="Next">›</button>
+      <button class="btn ghost" id="periodNow">Current</button>
+    </div>
+    <div class="stats" id="progressStats"></div>
+    <div class="panel"><h3>Completed in period</h3><div id="progressDone"></div></div>
+    <div class="empty" style="text-align:left">Hours are attributed to the period in which a task was completed.</div>
+  </section>
+
+  <!-- DAILY LOG -->
+  <section class="view" id="view-log" hidden>
+    <div class="panel">
+      <h3>Standup entry</h3>
+      <div class="form-grid">
+        <label class="full">Date <input type="date" id="logDate"></label>
+        <label class="full">Yesterday / Done <textarea id="logDone" placeholder="What did you complete?"></textarea></label>
+        <label class="full">Today / Plan <textarea id="logPlan" placeholder="What will you work on?"></textarea></label>
+        <label class="full">Blockers <textarea id="logBlockers" placeholder="Anything blocking you?"></textarea></label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="saveLog">Save entry</button>
+        <button class="btn ghost" id="prefillLog">Prefill from board</button>
+      </div>
+    </div>
+    <div class="panel"><h3>History</h3><div id="logHistory"></div></div>
+  </section>
+</main>
+
+<!-- LOGIN -->
+<div class="modal-bg" id="loginScreen" hidden>
+  <form class="modal" id="loginForm" autocomplete="off">
+    <h2>Dev<span style="color:var(--accent)">Track</span> Login</h2>
+    <label>Username <input id="lUser" required autofocus></label>
+    <label>Password
+      <div class="pw-row">
+        <input id="lPass" type="password" required>
+        <button type="button" class="btn ghost" id="lToggle">Show</button>
+      </div>
+    </label>
+    <div class="login-error" id="loginError" role="alert"></div>
+    <button type="submit" class="btn" style="width:100%">Sign in</button>
+    <div class="demo-hint">
+      Demo credentials<br>
+      Username: <code id="demoUser"></code> · Password: <code id="demoPass"></code>
+      <button type="button" class="btn ghost" id="lFill" style="padding:3px 10px;margin-left:6px">Fill</button>
+    </div>
+  </form>
+</div>
+
+<!-- TASK MODAL -->
+<div class="modal-bg" id="modal" hidden>
+  <form class="modal" id="taskForm">
+    <h2 id="modalTitle">New Task</h2>
+    <div class="form-grid">
+      <label class="full">Title <input id="fTitle" required></label>
+      <label>Ticket / ID <input id="fTicket" placeholder="e.g. JIRA-123"></label>
+      <label>Project <input id="fProject" list="projectList" placeholder="e.g. Backend API"></label>
+      <datalist id="projectList"></datalist>
+      <label>Type
+        <select id="fType"><option>feature</option><option>bug</option><option>chore</option><option>research</option></select>
+      </label>
+      <label>Priority
+        <select id="fPriority"><option>critical</option><option>high</option><option selected>medium</option><option>low</option></select>
+      </label>
+      <label>Status
+        <select id="fStatus"></select>
+      </label>
+      <label>Due date <input type="date" id="fDue"></label>
+      <label>Estimate (hours) <input type="number" min="0" step="0.5" id="fEstimate"></label>
+      <label>Time logged (hours) <input type="number" min="0" step="0.25" id="fLogged"></label>
+      <label class="full">Tags (comma separated) <input id="fTags" placeholder="frontend, refactor"></label>
+      <label class="full">PR / Link <input id="fLink" placeholder="https://github.com/…"></label>
+      <label class="full">Description / Notes <textarea id="fDesc"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button type="submit" class="btn">Save</button>
+      <button type="button" class="btn ghost" id="cancelBtn">Cancel</button>
+      <div class="spacer"></div>
+      <button type="button" class="btn danger" id="deleteBtn" hidden>Delete</button>
+    </div>
+  </form>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-bg" id="profileModal" hidden>
+  <form class="modal" id="profileForm">
+    <div class="profile-head">
+      <span class="avatar lg" id="avatarLg"></span>
+      <div><h2 style="margin:0">User Profile</h2><small style="color:var(--muted)" id="profileSince"></small></div>
+    </div>
+    <div class="form-grid">
+      <label>Full name <input id="pName" required></label>
+      <label>Username <input id="pUsername" required></label>
+      <label>Email <input type="email" id="pEmail"></label>
+      <label>Phone <input id="pPhone"></label>
+      <label>Role <input id="pRole"></label>
+      <label>Team <input id="pTeam"></label>
+      <label>Location <input id="pLocation"></label>
+      <label>Daily capacity (hours) <input type="number" min="0" step="0.5" id="pCapacity"></label>
+      <label class="full">Bio <textarea id="pBio"></textarea></label>
+    </div>
+    <div class="modal-actions">
+      <button type="submit" class="btn">Save profile</button>
+      <button type="button" class="btn ghost" id="profileCancel">Cancel</button>
+      <div class="spacer"></div>
+      <button type="button" class="btn ghost" id="profileReset">Reset to test user</button>
+    </div>
+  </form>
+</div>
+
+<script>
+// Test user used until the profile is edited
+const TEST_PROFILE = {
+  name: 'Test User', username: 'testuser01', email: 'test.user@example.com', phone: '+91 98765 43210',
+  role: 'Software Engineer', team: 'Platform', location: 'Bengaluru, India', capacity: 6,
+  bio: 'Demo account for the DevTrack workshop.', memberSince: '2026-01-15',
+};
+// Client-side demo gate only (not real security)
+const TEST_CREDENTIALS = { username: 'testuser01', password: 'Test@1234' };
+const AUTH_KEY = 'devtrack-auth';
+const STATUSES = [
+  { id: 'todo', label: 'To Do' },
+  { id: 'progress', label: 'In Progress' },
+  { id: 'review', label: 'Code Review' },
+  { id: 'done', label: 'Done' },
+];
+const STORE_KEY = 'devtrack-v1';
+const $ = s => document.querySelector(s);
+
+let state = load();
+let editingId = null;
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (s && Array.isArray(s.tasks)) return { logs: [], theme: 'light', profile: { ...TEST_PROFILE }, ...s };
+  } catch (e) {}
+  return { tasks: [], logs: [], theme: 'light', profile: { ...TEST_PROFILE } };
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const today = () => new Date().toISOString().slice(0, 10);
+
+// Total hours = stored hours + time on a running timer
+function hours(t) {
+  let h = t.logged || 0;
+  if (t.timerStart) h += (Date.now() - t.timerStart) / 3600000;
+  return h;
+}
+const fmtH = h => h < 1 ? `${Math.round(h * 60)}m` : `${h.toFixed(1)}h`;
+
+/* ---------- Board ---------- */
+function filteredTasks() {
+  const q = $('#search').value.toLowerCase();
+  const ty = $('#filterType').value, pr = $('#filterPriority').value, pj = $('#filterProject').value;
+  return state.tasks.filter(t =>
+    (!ty || t.type === ty) && (!pr || t.priority === pr) && (!pj || t.project === pj) &&
+    (!q || [t.title, t.desc, t.ticket, t.project, (t.tags || []).join(' ')].join(' ').toLowerCase().includes(q))
+  );
+}
+
+const PRIORITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+
+function renderBoard() {
+  const tasks = filteredTasks();
+  $('#board').innerHTML = STATUSES.map(s => {
+    const list = tasks.filter(t => t.status === s.id)
+      .sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority]);
+    return `<div class="column" data-status="${s.id}">
+      <h2>${s.label}<span>${list.length}</span></h2>
+      <div class="cards">${list.map(cardHTML).join('') || '<div class="empty">Drop tasks here</div>'}</div>
+    </div>`;
+  }).join('');
+  bindDrag();
+}
+
+function cardHTML(t) {
+  const overdue = t.due && t.status !== 'done' && t.due < today();
+  const est = t.estimate ? ` / ${t.estimate}h` : '';
+  return `<div class="card p-${t.priority}" draggable="true" data-id="${t.id}">
+    <div class="title">${t.ticket ? `<span style="color:var(--muted)">${esc(t.ticket)}</span> ` : ''}${esc(t.title)}</div>
+    <div class="meta">
+      <span class="badge ${t.type}">${t.type}</span>
+      ${t.project ? `<span>📁 ${esc(t.project)}</span>` : ''}
+      ${t.due ? `<span class="${overdue ? 'overdue' : ''}">📅 ${t.due}</span>` : ''}
+      ${(t.tags || []).map(g => `<span class="badge">#${esc(g)}</span>`).join('')}
+    </div>
+    <div class="meta" style="margin-top:6px">
+      <span>⏱ <span class="time" data-id="${t.id}">${fmtH(hours(t))}</span>${est}</span>
+      ${t.link ? `<a href="${esc(t.link)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">🔗 link</a>` : ''}
+      ${t.status !== 'done' ? `<button class="timer-btn ${t.timerStart ? 'running' : ''}" data-timer="${t.id}">${t.timerStart ? '■ Stop' : '▶ Start'}</button>` : ''}
+    </div>
+  </div>`;
+}
+
+function bindDrag() {
+  document.querySelectorAll('.card').forEach(c => {
+    c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', c.dataset.id); c.classList.add('dragging'); });
+    c.addEventListener('dragend', () => c.classList.remove('dragging'));
+    c.addEventListener('click', e => { if (!e.target.closest('[data-timer]')) openModal(c.dataset.id); });
+  });
+  document.querySelectorAll('.column').forEach(col => {
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', e => {
+      e.preventDefault(); col.classList.remove('drag-over');
+      const t = state.tasks.find(x => x.id === e.dataTransfer.getData('text/plain'));
+      if (t) setStatus(t, col.dataset.status);
+    });
+  });
+  document.querySelectorAll('[data-timer]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation(); toggleTimer(b.dataset.timer);
+  }));
+}
+
+function setStatus(t, status) {
+  if (t.status === status) return;
+  t.status = status;
+  if (status === 'done') { stopTimer(t); t.completedAt = Date.now(); }
+  else delete t.completedAt;
+  if (status === 'progress' && !t.startedAt) t.startedAt = Date.now();
+  save(); renderAll();
+}
+
+function stopTimer(t) {
+  if (t.timerStart) { t.logged = hours(t); delete t.timerStart; }
+}
+function toggleTimer(id) {
+  const t = state.tasks.find(x => x.id === id);
+  if (t.timerStart) stopTimer(t);
+  else {
+    state.tasks.forEach(stopTimer); // only one timer at a time
+    t.timerStart = Date.now();
+    if (t.status === 'todo') { t.status = 'progress'; t.startedAt = t.startedAt || Date.now(); }
+  }
+  save(); renderAll();
+}
+// Live-update running timers
+setInterval(() => {
+  document.querySelectorAll('.time').forEach(el => {
+    const t = state.tasks.find(x => x.id === el.dataset.id);
+    if (t && t.timerStart) el.textContent = fmtH(hours(t));
+  });
+}, 15000);
+
+/* ---------- Modal ---------- */
+$('#fStatus').innerHTML = STATUSES.map(s => `<option value="${s.id}">${s.label}</option>`).join('');
+
+function openModal(id) {
+  editingId = id || null;
+  const t = state.tasks.find(x => x.id === id) || { type: 'feature', priority: 'medium', status: 'todo' };
+  $('#modalTitle').textContent = id ? 'Edit Task' : 'New Task';
+  $('#fTitle').value = t.title || '';
+  $('#fTicket').value = t.ticket || '';
+  $('#fProject').value = t.project || '';
+  $('#fType').value = t.type;
+  $('#fPriority').value = t.priority;
+  $('#fStatus').value = t.status;
+  $('#fDue').value = t.due || '';
+  $('#fEstimate').value = t.estimate || '';
+  $('#fLogged').value = id ? +hours(t).toFixed(2) || '' : '';
+  $('#fTags').value = (t.tags || []).join(', ');
+  $('#fLink').value = t.link || '';
+  $('#fDesc').value = t.desc || '';
+  $('#deleteBtn').hidden = !id;
+  $('#modal').hidden = false;
+  $('#fTitle').focus();
+}
+const closeModal = () => { $('#modal').hidden = true; editingId = null; };
+
+$('#taskForm').addEventListener('submit', e => {
+  e.preventDefault();
+  let t = state.tasks.find(x => x.id === editingId);
+  if (!t) { t = { id: uid(), createdAt: Date.now() }; state.tasks.push(t); }
+  const newStatus = $('#fStatus').value;
+  Object.assign(t, {
+    title: $('#fTitle').value.trim(),
+    ticket: $('#fTicket').value.trim(),
+    project: $('#fProject').value.trim(),
+    type: $('#fType').value,
+    priority: $('#fPriority').value,
+    due: $('#fDue').value,
+    estimate: parseFloat($('#fEstimate').value) || 0,
+    logged: parseFloat($('#fLogged').value) || 0,
+    tags: $('#fTags').value.split(',').map(s => s.trim()).filter(Boolean),
+    link: $('#fLink').value.trim(),
+    desc: $('#fDesc').value,
+  });
+  if (t.timerStart) t.timerStart = Date.now(); // logged value now includes elapsed time
+  if (!t.status) t.status = newStatus;
+  setStatus(t, newStatus);
+  save(); closeModal(); renderAll();
+});
+$('#cancelBtn').onclick = closeModal;
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && $('#modal').hidden) {
+    e.preventDefault(); openModal();
+  }
+});
+
+// Two-click delete confirmation (no native confirm dialogs)
+$('#deleteBtn').onclick = function () {
+  if (this.dataset.armed) {
+    state.tasks = state.tasks.filter(x => x.id !== editingId);
+    save(); closeModal(); renderAll();
+  } else {
+    this.dataset.armed = '1'; this.textContent = 'Click again to confirm';
+    setTimeout(() => { delete this.dataset.armed; this.textContent = 'Delete'; }, 3000);
+  }
+};
+$('#newTaskBtn').onclick = () => openModal();
+
+/* ---------- Dashboard ---------- */
+function bars(el, entries, fmt) {
+  const max = Math.max(1, ...entries.map(e => e[1]));
+  el.innerHTML = entries.length ? entries.map(([k, v]) => `<div class="row">
+      <span>${esc(k)}</span><div class="track"><div class="fill" style="width:${v / max * 100}%"></div></div><span>${fmt(v)}</span>
+    </div>`).join('') : '<div class="empty">No data yet</div>';
+}
+
+function renderDashboard() {
+  const T = state.tasks;
+  const weekAgo = Date.now() - 7 * 864e5;
+  const done = T.filter(t => t.status === 'done');
+  const open = T.length - done.length;
+  const overdue = T.filter(t => t.due && t.status !== 'done' && t.due < today()).length;
+  const totalH = T.reduce((s, t) => s + hours(t), 0);
+  const doneWeek = done.filter(t => t.completedAt > weekAgo).length;
+  const bugs = T.filter(t => t.type === 'bug' && t.status !== 'done').length;
+  const estDone = done.filter(t => t.estimate);
+  const accuracy = estDone.length
+    ? Math.round(estDone.reduce((s, t) => s + t.estimate, 0) / Math.max(0.01, estDone.reduce((s, t) => s + hours(t), 0)) * 100) + '%'
+    : '—';
+
+  $('#stats').innerHTML = [
+    ['Open tasks', open], ['Done this week', doneWeek], ['Overdue', overdue],
+    ['Open bugs', bugs], ['Total time logged', fmtH(totalH)], ['Estimate accuracy', accuracy],
+  ].map(([l, v]) => `<div class="stat"><div class="label">${l}</div><div class="value">${v}</div></div>`).join('');
+
+  const byProj = {};
+  T.forEach(t => { const k = t.project || '(none)'; byProj[k] = (byProj[k] || 0) + hours(t); });
+  bars($('#timeByProject'), Object.entries(byProj).sort((a, b) => b[1] - a[1]), fmtH);
+
+  const byType = {};
+  T.forEach(t => byType[t.type] = (byType[t.type] || 0) + 1);
+  bars($('#byType'), Object.entries(byType).sort((a, b) => b[1] - a[1]), v => v);
+
+  const upcoming = T.filter(t => t.due && t.status !== 'done').sort((a, b) => a.due.localeCompare(b.due)).slice(0, 10);
+  $('#upcoming').innerHTML = upcoming.length ? `<table><tr><th>Due</th><th>Task</th><th>Priority</th><th>Status</th></tr>${
+    upcoming.map(t => `<tr><td class="${t.due < today() ? 'overdue' : ''}">${t.due}</td><td>${esc(t.title)}</td><td>${t.priority}</td><td>${STATUSES.find(s => s.id === t.status).label}</td></tr>`).join('')
+  }</table>` : '<div class="empty">Nothing scheduled</div>';
+
+  const recent = done.sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)).slice(0, 10);
+  $('#recentDone').innerHTML = recent.length ? `<table><tr><th>Completed</th><th>Task</th><th>Project</th><th>Time</th></tr>${
+    recent.map(t => `<tr><td>${t.completedAt ? new Date(t.completedAt).toLocaleDateString() : '—'}</td><td>${esc(t.title)}</td><td>${esc(t.project || '')}</td><td>${fmtH(hours(t))}</td></tr>`).join('')
+  }</table>` : '<div class="empty">No completed tasks yet</div>';
+}
+
+/* ---------- Progress (weekly / monthly) ---------- */
+let period = 'week', periodOffset = 0;
+
+// Returns [start, end) as ms timestamps for the period shifted by `off` periods
+function periodRange(off) {
+  const n = new Date();
+  if (period === 'month') {
+    return [new Date(n.getFullYear(), n.getMonth() + off, 1), new Date(n.getFullYear(), n.getMonth() + off + 1, 1)];
+  }
+  const mondayDelta = (n.getDay() + 6) % 7;
+  const start = new Date(n.getFullYear(), n.getMonth(), n.getDate() - mondayDelta + off * 7);
+  return [start, new Date(start.getFullYear(), start.getMonth(), start.getDate() + 7)];
+}
+const localDate = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function periodStats([s, e]) {
+  const ts = x => x >= s.getTime() && x < e.getTime();
+  const done = state.tasks.filter(t => t.status === 'done' && t.completedAt && ts(t.completedAt));
+  const sd = localDate(s), ed = localDate(e);
+  return {
+    done,
+    completed: done.length,
+    started: state.tasks.filter(t => t.startedAt && ts(t.startedAt)).length,
+    bugs: done.filter(t => t.type === 'bug').length,
+    hours: done.reduce((a, t) => a + hours(t), 0),
+    logs: state.logs.filter(l => l.date >= sd && l.date < ed).length,
+  };
+}
+
+function deltaHTML(cur, prev, fmt = v => v) {
+  const d = cur - prev;
+  if (!d) return '<div class="delta">— same as previous</div>';
+  return `<div class="delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲' : '▼'} ${fmt(Math.abs(d))} vs previous</div>`;
+}
+
+function renderProgress() {
+  const range = periodRange(periodOffset);
+  const cur = periodStats(range), prev = periodStats(periodRange(periodOffset - 1));
+  const [s, e] = range;
+  const lastDay = new Date(e.getFullYear(), e.getMonth(), e.getDate() - 1);
+  $('#periodLabel').textContent = period === 'month'
+    ? s.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    : `${s.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${lastDay.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  $('#periodNext').disabled = periodOffset >= 0;
+  document.querySelectorAll('#periodSeg button').forEach(b => b.classList.toggle('active', b.dataset.period === period));
+
+  const overdue = state.tasks.filter(t => t.due && t.status !== 'done' && t.due < today()).length;
+  $('#progressStats').innerHTML = [
+    ['Tasks completed', cur.completed, deltaHTML(cur.completed, prev.completed)],
+    ['Tasks started', cur.started, deltaHTML(cur.started, prev.started)],
+    ['Bugs closed', cur.bugs, deltaHTML(cur.bugs, prev.bugs)],
+    ['Hours logged', fmtH(cur.hours), deltaHTML(cur.hours, prev.hours, fmtH)],
+    ['Standup entries', cur.logs, deltaHTML(cur.logs, prev.logs)],
+    ['Overdue now', overdue, ''],
+  ].map(([l, v, d]) => `<div class="stat"><div class="label">${l}</div><div class="value">${v}</div>${d}</div>`).join('');
+
+  const list = cur.done.sort((a, b) => b.completedAt - a.completedAt);
+  $('#progressDone').innerHTML = list.length ? `<table><tr><th>Completed</th><th>Task</th><th>Project</th><th>Time</th></tr>${
+    list.map(t => `<tr><td>${new Date(t.completedAt).toLocaleDateString()}</td><td>${esc(t.title)}</td><td>${esc(t.project || '')}</td><td>${fmtH(hours(t))}</td></tr>`).join('')
+  }</table>` : '<div class="empty">No tasks completed in this period</div>';
+}
+
+document.querySelectorAll('#periodSeg button').forEach(b => b.onclick = () => { period = b.dataset.period; periodOffset = 0; renderProgress(); });
+$('#periodPrev').onclick = () => { periodOffset--; renderProgress(); };
+$('#periodNext').onclick = () => { if (periodOffset < 0) { periodOffset++; renderProgress(); } };
+$('#periodNow').onclick = () => { periodOffset = 0; renderProgress(); };
+
+/* ---------- Daily log ---------- */
+$('#logDate').value = today();
+function loadLogForm() {
+  const e = state.logs.find(l => l.date === $('#logDate').value) || {};
+  $('#logDone').value = e.done || ''; $('#logPlan').value = e.plan || ''; $('#logBlockers').value = e.blockers || '';
+}
+$('#logDate').onchange = loadLogForm;
+$('#saveLog').onclick = () => {
+  const date = $('#logDate').value || today();
+  const entry = { date, done: $('#logDone').value.trim(), plan: $('#logPlan').value.trim(), blockers: $('#logBlockers').value.trim() };
+  state.logs = state.logs.filter(l => l.date !== date).concat(entry).sort((a, b) => b.date.localeCompare(a.date));
+  save(); renderLog();
+};
+$('#prefillLog').onclick = () => {
+  const dayAgo = Date.now() - 864e5;
+  const line = t => `- ${t.ticket ? t.ticket + ': ' : ''}${t.title}`;
+  $('#logDone').value = state.tasks.filter(t => t.completedAt > dayAgo).map(line).join('\n');
+  $('#logPlan').value = state.tasks.filter(t => t.status === 'progress' || t.status === 'review').map(line).join('\n');
+};
+function renderLog() {
+  const sec = (n, v) => v ? `<div class="log-sec">${n}</div><pre>${esc(v)}</pre>` : '';
+  $('#logHistory').innerHTML = state.logs.length ? state.logs.map(l => `<div class="log-entry">
+      <div class="date">${new Date(l.date + 'T00:00').toDateString()}</div>
+      ${sec('Done', l.done)}${sec('Plan', l.plan)}${sec('Blockers', l.blockers)}
+    </div>`).join('') : '<div class="empty">No entries yet</div>';
+}
+
+/* ---------- Common ---------- */
+function refreshProjects() {
+  const projects = [...new Set(state.tasks.map(t => t.project).filter(Boolean))].sort();
+  const sel = $('#filterProject'), cur = sel.value;
+  sel.innerHTML = '<option value="">All projects</option>' + projects.map(p => `<option>${esc(p)}</option>`).join('');
+  sel.value = projects.includes(cur) ? cur : '';
+  $('#projectList').innerHTML = projects.map(p => `<option value="${esc(p)}">`).join('');
+}
+function renderAll() { refreshProjects(); renderBoard(); renderDashboard(); renderProgress(); renderLog(); renderProfile(); }
+
+/* ---------- Profile ---------- */
+const PROFILE_FIELDS = { pName: 'name', pUsername: 'username', pEmail: 'email', pPhone: 'phone', pRole: 'role',
+  pTeam: 'team', pLocation: 'location', pCapacity: 'capacity', pBio: 'bio' };
+const initials = n => (n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+
+function renderProfile() {
+  const p = state.profile;
+  $('#avatarSm').textContent = $('#avatarLg').textContent = initials(p.name);
+  $('#profileName').textContent = p.name;
+  $('#profileRole').textContent = [p.role, p.team].filter(Boolean).join(' · ');
+  $('#profileSince').textContent = `@${p.username}` + (p.memberSince ? ` · member since ${p.memberSince}` : '');
+}
+function fillProfileForm(p) {
+  Object.entries(PROFILE_FIELDS).forEach(([id, k]) => $('#' + id).value = p[k] ?? '');
+}
+const closeProfile = () => { $('#profileModal').hidden = true; };
+$('#profileBtn').onclick = () => { fillProfileForm(state.profile); $('#profileModal').hidden = false; $('#pName').focus(); };
+$('#profileCancel').onclick = closeProfile;
+$('#profileReset').onclick = () => fillProfileForm(TEST_PROFILE);
+$('#profileModal').addEventListener('click', e => { if (e.target.id === 'profileModal') closeProfile(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeProfile(); });
+$('#profileForm').addEventListener('submit', e => {
+  e.preventDefault();
+  Object.entries(PROFILE_FIELDS).forEach(([id, k]) => {
+    const v = $('#' + id).value.trim();
+    state.profile[k] = k === 'capacity' ? (parseFloat(v) || 0) : v;
+  });
+  save(); renderProfile(); closeProfile();
+});
+
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== 'view-' + b.dataset.view);
+  if (b.dataset.view === 'dashboard') renderDashboard();
+});
+['#search', '#filterType', '#filterPriority', '#filterProject'].forEach(s => $(s).addEventListener('input', renderBoard));
+
+function applyTheme() { document.documentElement.dataset.theme = state.theme; }
+$('#themeBtn').onclick = () => { state.theme = state.theme === 'dark' ? 'light' : 'dark'; applyTheme(); save(); };
+
+$('#exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `devtrack-${today()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(txt => {
+    try {
+      const data = JSON.parse(txt);
+      if (!Array.isArray(data.tasks)) throw new Error('missing tasks');
+      state = { logs: [], theme: state.theme, profile: state.profile, ...data };
+      save(); applyTheme(); renderAll();
+    } catch (err) { alert('Invalid DevTrack file: ' + err.message); }
+  });
+  e.target.value = '';
+};
+
+// Seed sample tasks on first launch
+if (!state.tasks.length && !localStorage.getItem(STORE_KEY)) {
+  const d = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10);
+  state.tasks = [
+    { id: uid(), title: 'Implement OAuth login', ticket: 'AUTH-12', project: 'Web App', type: 'feature', priority: 'high', status: 'progress', due: d(3), estimate: 8, logged: 3.5, tags: ['backend', 'security'], createdAt: Date.now() },
+    { id: uid(), title: 'Fix null pointer in payment service', ticket: 'PAY-87', project: 'Payments', type: 'bug', priority: 'critical', status: 'todo', due: d(1), estimate: 2, logged: 0, tags: ['hotfix'], createdAt: Date.now() },
+    { id: uid(), title: 'Upgrade React to latest', project: 'Web App', type: 'chore', priority: 'low', status: 'todo', estimate: 4, logged: 0, tags: ['frontend'], createdAt: Date.now() },
+    { id: uid(), title: 'Add caching layer for search API', ticket: 'API-45', project: 'Backend API', type: 'feature', priority: 'medium', status: 'review', estimate: 6, logged: 5, tags: ['performance'], link: '', createdAt: Date.now() },
+    { id: uid(), title: 'Evaluate message queue options', project: 'Backend API', type: 'research', priority: 'medium', status: 'done', estimate: 3, logged: 4, tags: ['architecture'], createdAt: Date.now(), completedAt: Date.now() - 2 * 864e5 },
+  ];
+  save();
+}
+
+/* ---------- Login ---------- */
+const isAuthed = () => !!sessionStorage.getItem(AUTH_KEY);
+function showLogin(show) {
+  document.body.classList.toggle('logged-out', show);
+  $('#loginScreen').hidden = !show;
+  if (show) { $('#lUser').value = ''; $('#lPass').value = ''; $('#loginError').textContent = ''; $('#lUser').focus(); }
+}
+$('#demoUser').textContent = TEST_CREDENTIALS.username;
+$('#demoPass').textContent = TEST_CREDENTIALS.password;
+$('#lFill').onclick = () => { $('#lUser').value = TEST_CREDENTIALS.username; $('#lPass').value = TEST_CREDENTIALS.password; };
+$('#lToggle').onclick = () => {
+  const show = $('#lPass').type === 'password';
+  $('#lPass').type = show ? 'text' : 'password';
+  $('#lToggle').textContent = show ? 'Hide' : 'Show';
+};
+$('#loginForm').addEventListener('submit', e => {
+  e.preventDefault();
+  if ($('#lUser').value.trim() === TEST_CREDENTIALS.username && $('#lPass').value === TEST_CREDENTIALS.password) {
+    sessionStorage.setItem(AUTH_KEY, TEST_CREDENTIALS.username);
+    showLogin(false);
+  } else {
+    $('#loginError').textContent = 'Invalid username or password.';
+  }
+});
+$('#logoutBtn').onclick = () => { sessionStorage.removeItem(AUTH_KEY); closeModal(); closeProfile(); showLogin(true); };
+// Keyboard shortcuts must not fire behind the login screen
+document.addEventListener('keydown', e => { if (!isAuthed()) e.stopImmediatePropagation(); }, true);
+
+applyTheme();
+renderAll();
+showLogin(!isAuthed());
+</script>
+</body>
+</html>

@@ -10,7 +10,9 @@ DevTrack: a developer work tracker (Kanban board, dashboard, daily standup log) 
 
 ## Running
 
-There is no build, lint, or test tooling. Open `work-tracker.html` directly in a browser (no server needed). Reload to see changes.
+There is no build or lint tooling. Open `work-tracker.html` directly in a browser (no server needed). Reload to see changes.
+
+Login test: `node test-login.js` serves the folder on `localhost:8123` and drives the app with Playwright (headless by default; `HEADED=1` shows a slowed-down visible browser). It needs the `playwright` package, which is not in the repo (no `package.json`); install it with `npm i playwright` (a version matching the installed browsers) and make it resolvable, for example via `NODE_PATH`. It exits non-zero if any check fails.
 
 ## Architecture
 

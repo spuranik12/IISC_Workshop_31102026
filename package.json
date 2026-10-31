@@ -1,0 +1,15 @@
+{
+  "name": "devtrack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DevTrack work tracker (single-file app) with a Playwright login test",
+  "scripts": {
+    "test": "node test-login.js",
+    "test:headed": "cross-env HEADED=1 node test-login.js",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "playwright": "~1.53.0"
+  }
+}
